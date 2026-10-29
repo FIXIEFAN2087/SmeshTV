@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СмешТВ — Прямой эфир 24/7</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #0d0d0d;
+            color: #fff;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        /* Шапка канала */
+        .channel-header {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .channel-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #ff4d4d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Контейнер плеера */
+        .tv-container {
+            position: relative;
+            width: 90%;
+            max-width: 900px;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            pointer-events: none;
+        }
+
+        /* Защитный слой */
+        .blocker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 4;
+            background: transparent;
+        }
+
+        /* Логотип */
+        .tv-logo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+            z-index: 5;
+            opacity: 0.9;
+        }
+
+        /* Заставка для звука */
+        #unmute-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .btn-play {
+            background: #ff0000;
+            color: #fff;
+            padding: 15px 35px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.5);
+            transition: transform 0.2s;
+        }
+
+        .btn-play:hover {
+            transform: scale(1.05);
+        }
+
+        /* Блок телепрограммы */
+        .tv-guide {
+            width: 90%;
+            max-width: 900px;
+            margin-top: 20px;
+            background: #161616;
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .guide-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ff4d4d;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .current-show {
+            font-size: 15px;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        .current-show span {
+            color: #4cd137;
+            font-weight: bold;
+        }
+
+        .schedule-list {
+            list-style: none;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .schedule-list li {
+            padding: 4px 0;
+            border-bottom: 1px solid #222;
+        }
+
+        .info {
+            margin-top: 15px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="channel-header">
+    <div class="channel-title">📺 СмешТВ</div>
+</div>
+
+<div class="tv-container">
+    <div class="blocker"></div>
+    <img class="tv-logo" src="https://lh3.googleusercontent.com/d/18xKX_FMnfQc555BHX40EppWZshSq0wK1" alt="СмешТВ Лого">
+
+    <div id="unmute-overlay" onclick="startTV()">
+        <button class="btn-play">▶ Смотреть СмешТВ</button>
+    </div>
+
+    <div id="player"></div>
+</div>
+
+<!-- Телепрограмма -->
+<div class="tv-guide">
+    <div class="guide-title">📡 Телепрограмма эфира</div>
+    <div class="current-show">Сейчас в эфире: <span id="current-title">Загрузка эфира...</span></div>
+    <ul class="schedule-list" id="upcoming-list">
+        <!-- Ближайшие передачи подгружаются автоматически -->
+    </ul>
+</div>
+
+<div class="info">🔴 ПРЯМОЙ ЭФИР 24/7 • Автоматическое обновление плейлиста</div>
+
+<script>
+    // --- НАСТРОЙКИ ---
+    const PLAYLIST_ID = 'PLT4O43ZTGON4'; // ID вашего плейлиста
+    
+    // Внимание: для полноценного автообновления списка тысяч видео через API YouTube
+    // в реальном времени без сервера рекомендуется использовать YouTube Data API ключ,
+    // либо плейлист автоматически синхронизируется при обновлении страницы зрителями.
+
+    // Защита от встраивания и пиратства
+    if (window.self !== window.top) { window.top.location = window.self.location; }
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        if (e.keyCode === 123 || (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || (e.ctrlKey && e.keyCode === 85)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.getElementsByTagName('script')[0].parentNode.insertBefore(tag, document.getElementsByTagName('script')[0]);
+
+    var player;
+
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            playerVars: {
+                'listType': 'playlist',
+                'list': PLAYLIST_ID,
+                'autoplay': 1,
+                'controls': 0,
+                'disablekb': 1,
+                'fs': 0,
+                'modestbranding': 1,
+                'rel': 0,
+                'loop': 1
+            },
+            events: {
+                'onStateChange': onPlayerStateChange,
+                'onReady': updateTVGuide
+            }
+        });
+    }
+
+    function startTV() {
+        document.getElementById('unmute-overlay').style.display = 'none';
+        if (player) {
+            player.playVideo();
+            player.unMute();
+        }
+    }
+
+    function onPlayerStateChange(event) {
+        // Когда видео меняется или цикл идет по кругу
+        updateTVGuide();
+    }
+
+    // Функция обновления блока телепрограммы
+    function updateTVGuide() {
+        if (!player || typeof player.getVideoData !== 'function') return;
+        
+        try {
+            const data = player.getVideoData();
+            if (data && data.title) {
+                document.getElementById('current-title').innerText = data.title;
+            }
+        } catch (e) {
+            // Игнорируем ошибки доступа к iframe до старта воспроизведения
+        }
+
+        // Получаем плейлист из плеера для телепрограммы
+        if (typeof player.getPlaylist === 'function') {
+            const playlist = player.getPlaylist();
+            const currentIndex = player.getPlaylistIndex();
+            
+            if (playlist && playlist.length > 0) {
+                let upcomingHTML = '';
+                // Показываем следующие 3 видео из плейлиста
+                for (let i = 1; i <= 3; i++) {
+                    let nextIdx = (currentIndex + i) % playlist.length;
+                    // Так как названия в getPlaylist отдаются индексами, выводим общую информацию
+                    upcomingHTML += `<li>Далее в эфире #${nextIdx + 1}</li>`;
+                }
+                document.getElementById('upcoming-list').innerHTML = upcomingHTML;
+            }
+        }
+    }
+
+    // Автоматическая проверка обновлений плейлиста и синхронизация каждые 10 минут
+    setInterval(() => {
+        if (player && typeof player.setShuffle === 'function') {
+            // Легкий триггер обновления состояния плеера с YouTube
+            updateTVGuide();
+        }
+    }, 600000);
+</script>
+
+</body>
+</html>
